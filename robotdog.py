@@ -44,10 +44,6 @@ block=p.createMultiBody(baseMass=0,baseCollisionShapeIndex = sh_colBox,
 
 
 t0=time.time()
-t=time.time()
-while ((t-t0)<0.4):
-    t=time.time()
-
 
 cyaw=10
 cpitch=-15
@@ -81,16 +77,18 @@ while True:
         dog.drp=2
     if keys.get(65296): #Right
         dog.drp=1
-        xrcO=dog.xrO        #Set the center for the robot rotation to the current robot pos
-        lseqp=[1,0,2,3] #Change the leg sequence to open up the front arms rather than close them
+        dog.xrcO=dog.xrO        #Set the center for the robot rotation to the current robot pos
+        dog.set_leg_sequence_for_next_cycle(lseq=[1,0,2,3]) #Change the leg sequence to open up the front arms rather than close them
     if keys.get(65295): #Left
         dog.drp=3
-        xrcO=dog.xrO
-        lseqp=[0,1,3,2] #Change the leg sequence to open up the front arms rather than close them
+        dog.xrcO=dog.xrO
+        dog.set_leg_sequence_for_next_cycle(lseq=[0,1,3,2]) #Change the leg sequence to open up the front arms rather than close them
 	
     #Time cycle
-    tv=int(((time.time()-t0) * dog.walkLoopSpd)  % 800)
-    dog.walk(tv)
+    dog.walkLoopSpd = 400
+    dog.leg_cycle_length = dog.walkLoopSpd / 2
+    tv=int(((time.time()-t0) * dog.walkLoopSpd)  % (dog.walkLoopSpd * 2))
+    dog.walk_loop(tv)
     time.sleep(0.01)
 
 

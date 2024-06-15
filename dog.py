@@ -86,6 +86,7 @@ class Dog():
         
         #Walking speed (changes the walking loop time)
         self.walkLoopSpd=400
+        self.leg_cycle_length = self.walkLoopSpd / 2
 
     #Rotation matrix for yaw only between robot-frame and world-frame
     def RotYawr(self, yawr):
@@ -130,10 +131,9 @@ class Dog():
         #Calculate a new robot yaw ditrection also from the feet positions
         self.xfO=(self.legsO[:,0]+self.legsO[:,1])/2.0
         self.xbO=(self.legsO[:,2]+self.legsO[:,3])/2.0
-        xrOn=(self.xfO+self.xbO)/2.0 + np.array([0,0,0.5])
+        # xrOn=(self.xfO+self.xbO)/2.0 + np.array([0,0,0.5])
         xfmbO=self.xfO-self.xbO
         self.yawrn=np.arctan2(xfmbO[1],xfmbO[0])
-
 
 
         #Change general motor speed
@@ -142,19 +142,22 @@ class Dog():
         #Current leg to change position
         l=0
         #Init the center for the robot rotation to the current robot pos
-        self.xrcO=self.xrO
+        self.xrcO = self.xrO
         #Set the body position to the robot position
-        self.xoff=0
-        self.yoff=0
+        self.xoff = 0
+        self.yoff = 0
         #Init to walking fwd
-        self.dr=0
-        self.drp=0
+        self.dr = 0
+        self.drp = 0
         #Leg sequence (for rotating the robot, I chose to chg legs in the order front-left, fr, br, bl)
-        self.lseq=[0,1,3,2]
-        self.lseqp=[0,1,3,2]
-        #lseq=[2,0,3,1]
-        #self.lseqp=[2,0,3,1]
+        self.set_leg_sequence()
 
+    def set_leg_sequence(self, lseq = [0,1,3,2]):
+        self.lseqp = lseq
+        self.lseq = lseq
+
+    def set_leg_sequence_for_next_cycle(self, lseq = [0,1,3,2]):
+        self.lseqp = lseq
 
     def set_weight_motor(self):
         #Due to the weight the prismatic extraweight block needs to be motored up
@@ -193,78 +196,33 @@ class Dog():
                 joint = leg*4 + j
                 p.setJointMotorControl2(self.dogId,joint,p.POSITION_CONTROL,targetPosition=a[j],force=1000,maxVelocity=speed)
 
-    def walk(self, tv):
-        #One leg movement in 200 units. one 4-leg walk cycle in 800 units
-        #Using <, >, % (modulo) and divide we can easily do something in a specific part of the cycle
+    def walk_loop(self, tv):
+        # 800 units is one full walk cycle
+        # with four legs, each leg moves in 200 units
         
-        #Apply new walking cycle type (e.g. chg from fwd to bkw) only at the start of next cycle
-        if tv<20 and (not self.dr==self.drp):
-            self.dr=self.drp
-            self.lseq=self.lseqp
+        # Only change direction if we're at the start of a new cycle
+        if tv < self.leg_cycle_length * 0.1 and (not self.dr==self.drp):
+            self.dr = self.drp
+            self.set_leg_sequence(self.lseqp)
+
+        # select the leg to move
+        l=int(tv / self.leg_cycle_length)
         
-        #Index of the leg to move
-        l=int(tv/200)
         #Actual leg to move
-        k=self.lseq[l]
+        leg_idx = self.lseq[l]
+
+        self.shift_body_weight(leg_idx, tv % self.leg_cycle_length)
         
-        #In the beginning of the leg cycle the body is centered at the robot center
-        #then it gradually moves in the opposite direction of the leg to be moved 
-        #to ensure the center of gravity remains on the other 3 legs
-        #when the moving leg goes down again the body center returns to the robot center
-        #The vars xoff and yoff move the body w.r.t. the robot center in the robot frame
-        if int(tv%200)<10:
-            self.xoff=0
-            self.yoff=0
-
-        elif int(tv%200)<80:
-            self.xoff+=0.002*(-1+2*int(k/2))  #Work it out on paper to see it moves opposite to the stepping leg
-            self.yoff+=0.002*(-1+2*(k%2))     
-
-        elif int(tv%200)>160:
-            self.xoff-=0.004*(-1+2*int(k/2))
-            self.yoff-=0.004*(-1+2*(k%2))     
-
         #Recalc leg rel pos in desired robot frame
         self.dlegsO=(self.legsO.T-self.xrO).T  #Translate
         dlegsR=np.dot(self.Ryawr.T,self.dlegsO)  #Rotate (Note the inverse rotation is the transposed matrix)
+        
         #Then apply the body movement and set the legs
         self.setlegsxyz(dlegsR[0]-self.xoff-0.03,dlegsR[1]-self.yoff,dlegsR[2],self.vvec)  #0.03 is for tweaking the center of grav.
         
+        # Calculate the new position of the leg to move
+        self.move_leg(leg_idx, tv % self.leg_cycle_length)
 
-        if int(tv%200)>80:
-            self.dlegsO=(self.legsO.T-self.xrcO).T
-            yawlO=np.arctan2(self.dlegsO[1,k],self.dlegsO[0,k])
-            rlO=np.sqrt(self.dlegsO[0,k]**2+self.dlegsO[1,k]**2)
-            
-            if self.dr==0:
-                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]+0.01*np.cos(self.yawr)
-                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]+0.01*np.sin(self.yawr)
-            elif self.dr==1:
-                yawlO-=0.015 
-                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]
-                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]
-            elif self.dr==2:
-                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]-0.01*np.cos(self.yawr)
-                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]-0.01*np.sin(self.yawr)
-            elif self.dr==3:
-                yawlO+=0.015 
-                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]
-                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]
-            
-            if int(tv%200)<150:
-                #Move leg k upwards 
-                self.legsO[2,k]+=.006
-            else:
-                #Move leg k wards 
-                self.legsO[2,k]-=.006
-        else:
-            #Move/keep all legs down to the ground
-            self.legsO[2,0]=0.0
-            self.legsO[2,1]=0.0
-            self.legsO[2,2]=0.0
-            self.legsO[2,3]=0.0
-            
-        
         #Calculate vectors and matrix for the next loop
         xfrO=(self.legsO[:,0]+self.legsO[:,1])/2.0
         xbkO=(self.legsO[:,2]+self.legsO[:,3])/2.0
@@ -273,3 +231,51 @@ class Dog():
         xfmbO=xfrO-xbkO
         self.yawr=np.arctan2(xfmbO[1],xfmbO[0])
         self.Ryawr=self.RotYawr(self.yawr)
+
+    def move_leg(self, leg_idx, leg_t):
+        # self.leg_cycle_length units is one full leg cycle
+        if int(leg_t) <= self.leg_cycle_length * 0.4:
+            # keep all legs down to the ground in the beginning of the leg cycle
+            self.legsO[2, :] = 0.0
+        else:
+            self.dlegsO=(self.legsO.T-self.xrcO).T
+            self.yawlO = np.arctan2(self.dlegsO[1, leg_idx], self.dlegsO[0, leg_idx])
+            self.rlO = np.sqrt(self.dlegsO[0, leg_idx]**2 + self.dlegsO[1, leg_idx]**2)
+
+            if self.leg_cycle_length * 0.4 < int(leg_t) <= self.leg_cycle_length * 0.75:
+                # move selected leg upwards
+                self.legsO[2, leg_idx] += 0.006
+            else:
+                # move selected leg downwards
+                self.legsO[2, leg_idx] -= 0.006
+            
+            if self.dr == 0:
+                self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]+0.01*np.cos(self.yawr)
+                self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]+0.01*np.sin(self.yawr)
+            elif self.dr == 1:
+                self.yawlO-=0.015 
+                self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]
+                self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]
+            elif self.dr == 2:
+                self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]-0.01*np.cos(self.yawr)
+                self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]-0.01*np.sin(self.yawr)
+            elif self.dr == 3:
+                self.yawlO+=0.015 
+                self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]
+                self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]
+
+
+    def shift_body_weight(self, leg_idx, leg_t):
+        #In the beginning of the leg cycle the body is centered at the robot center
+        #then it gradually moves in the opposite direction of the leg to be moved 
+        #to ensure the center of gravity remains on the other 3 legs
+        #when the moving leg goes down again the body center returns to the robot center
+        #The vars xoff and yoff move the body w.r.t. the robot center in the robot frame
+        
+        if self.leg_cycle_length * 0.05 < int(leg_t) < self.leg_cycle_length * 0.4:
+            self.xoff += 0.002*(-1+2*int(leg_idx/2))  #Work it out on paper to see it moves opposite to the stepping leg
+            self.yoff += 0.002*(-1+2*(leg_idx%2))     
+
+        elif int(leg_t) > self.leg_cycle_length * 0.8:
+            self.xoff -= 0.004*(-1+2*int(leg_idx/2))
+            self.yoff -= 0.004*(-1+2*(leg_idx%2))     
