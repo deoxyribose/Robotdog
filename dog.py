@@ -98,6 +98,9 @@ class Dog():
         # R means in robot-centered coordinates
         # r is for "of the robot"
         # i is initial
+        #Pre-init robot position
+        self.setlegsxyz([self.xhipf,self.xhipf,self.xhipb,self.xhipb],[self.yhipl+0.1,-self.yhipl-0.1,self.yhipl+0.1,-self.yhipl-0.1],[-0.5,-0.5,-0.5,-0.5],[1,1,1,1])
+
         yawri=1.3
         xrOi=np.array([1,1,0.5])
         legsRi=np.array([[self.xhipf,self.xhipf,self.xhipb,self.xhipb],
@@ -151,8 +154,6 @@ class Dog():
         self.lseqp=[0,1,3,2]
         #lseq=[2,0,3,1]
         #self.lseqp=[2,0,3,1]
-        #Pre-init robot position
-        self.setlegsxyz([self.xhipf,self.xhipf,self.xhipb,self.xhipb],[self.yhipl+0.1,-self.yhipl-0.1,self.yhipl+0.1,-self.yhipl-0.1],[-0.5,-0.5,-0.5,-0.5],[1,1,1,1])
 
 
     def set_weight_motor(self):
@@ -179,7 +180,15 @@ class Dog():
     def setlegsxyz(self, xvec,yvec,zvec,vvec):
         spd=1
         for leg in range(4):
-            a = xyztoang(xvec[leg]-self.xhipf,yvec[leg]-self.yhipl,zvec[leg],self.yoffh,self.hu,self.hl)
+            if leg == 0:
+                args = xvec[leg]-self.xhipf, yvec[leg] - self.yhipl, zvec[leg], self.yoffh, self.hu, self.hl
+            elif leg == 1:
+                args = xvec[leg]-self.xhipf, yvec[leg] + self.yhipl, zvec[leg], -self.yoffh, self.hu, self.hl
+            elif leg == 2:
+                args = xvec[leg]-self.xhipb, yvec[leg] - self.yhipl, zvec[leg], self.yoffh, self.hu, self.hl
+            elif leg == 3:
+                args = xvec[leg]-self.xhipb, yvec[leg] + self.yhipl, zvec[leg], -self.yoffh, self.hu, self.hl
+            a = xyztoang(*args)
             for j, speed in enumerate([spd, vvec[leg], vvec[leg]]):
                 joint = leg*4 + j
                 p.setJointMotorControl2(self.dogId,joint,p.POSITION_CONTROL,targetPosition=a[j],force=1000,maxVelocity=speed)
@@ -206,6 +215,7 @@ class Dog():
         if int(tv%200)<10:
             self.xoff=0
             self.yoff=0
+
         elif int(tv%200)<80:
             self.xoff+=0.002*(-1+2*int(k/2))  #Work it out on paper to see it moves opposite to the stepping leg
             self.yoff+=0.002*(-1+2*(k%2))     
@@ -218,7 +228,7 @@ class Dog():
         self.dlegsO=(self.legsO.T-self.xrO).T  #Translate
         dlegsR=np.dot(self.Ryawr.T,self.dlegsO)  #Rotate (Note the inverse rotation is the transposed matrix)
         #Then apply the body movement and set the legs
-        self.setlegsxyz(dlegsR[0]-self.xoff-0.03,dlegsR[1]-self.yoff,dlegsR[2],self.vvec, here = False)  #0.03 is for tweaking the center of grav.
+        self.setlegsxyz(dlegsR[0]-self.xoff-0.03,dlegsR[1]-self.yoff,dlegsR[2],self.vvec)  #0.03 is for tweaking the center of grav.
         
 
         if int(tv%200)>80:
@@ -227,19 +237,19 @@ class Dog():
             rlO=np.sqrt(self.dlegsO[0,k]**2+self.dlegsO[1,k]**2)
             
             if self.dr==0:
-                self.legsO[0,k]=rlO*np.cos(yawlO)+self.xrcO[0]+0.01*np.cos(self.yawr)
-                self.legsO[1,k]=rlO*np.sin(yawlO)+self.xrcO[1]+0.01*np.sin(self.yawr)
+                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]+0.01*np.cos(self.yawr)
+                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]+0.01*np.sin(self.yawr)
             elif self.dr==1:
                 yawlO-=0.015 
-                self.legsO[0,k]=rlO*np.cos(yawlO)+self.xrcO[0]
-                self.legsO[1,k]=rlO*np.sin(yawlO)+self.xrcO[1]
+                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]
+                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]
             elif self.dr==2:
-                self.legsO[0,k]=rlO*np.cos(yawlO)+self.xrcO[0]-0.01*np.cos(self.yawr)
-                self.legsO[1,k]=rlO*np.sin(yawlO)+self.xrcO[1]-0.01*np.sin(self.yawr)
+                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]-0.01*np.cos(self.yawr)
+                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]-0.01*np.sin(self.yawr)
             elif self.dr==3:
                 yawlO+=0.015 
-                self.legsO[0,k]=rlO*np.cos(yawlO)+self.xrcO[0]
-                self.legsO[1,k]=rlO*np.sin(yawlO)+self.xrcO[1]
+                self.legsO[0,k] = rlO*np.cos(yawlO)+self.xrcO[0]
+                self.legsO[1,k] = rlO*np.sin(yawlO)+self.xrcO[1]
             
             if int(tv%200)<150:
                 #Move leg k upwards 

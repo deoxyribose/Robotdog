@@ -57,7 +57,7 @@ while True:
     dogPos, _ = p.getBasePositionAndOrientation(dog.dogId)
     #Camera paramers to be able to yaw pitch and zoom the camera (Focus remains on the robot) 
 
-    # p.resetDebugVisualizerCamera( cameraDistance=cdist, cameraYaw=cyaw, cameraPitch=cpitch, cameraTargetPosition=dogPos)
+    p.resetDebugVisualizerCamera( cameraDistance=cdist, cameraYaw=cyaw, cameraPitch=cpitch, cameraTargetPosition=dogPos)
 
     keys = p.getKeyboardEvents()
     #Keys to change camera
