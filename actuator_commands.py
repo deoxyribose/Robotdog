@@ -1,22 +1,31 @@
 import numpy as np
 
 #Function to calculate roll, hip and knee angles from the x,y,z coords of the foot wrt the hip.
-def xyztoang(x, y, z, yoffh, hu, hl):
-    dyz = np.sqrt(y**2 + z**2)
-    lyz = np.sqrt(dyz**2 - yoffh**2)
-    gamma_yz =  -np.arctan(y / z)
-    gamma_h_offset =  -np.arctan(-yoffh / lyz)
+def xyztoang(foot_x, foot_y, foot_z, hip_width, thigh_length, calf_length):
+    """
+    Calculate the roll, hip and knee angles from the x,y,z coords of the foot wrt the hip.
+    """
+    hip_to_foot_distance_along_y_z_plane = np.sqrt(foot_y**2 + foot_z**2)
+    bent_leg_length = np.sqrt(hip_to_foot_distance_along_y_z_plane**2 - hip_width**2)
+    
+    gamma_yz =  -np.arctan(foot_y / foot_z)
+    gamma_h_offset =  -np.arctan(-hip_width / bent_leg_length)
     gamma = gamma_yz - gamma_h_offset
     
-    lxzp = np.sqrt(lyz**2 + x**2)
-    n = (lxzp**2 - hl**2 - hu**2) / (2*hu)
-    beta =  -np.arccos(n / hl)
-    
-    alfa_xzp =  -np.arctan(x / lyz)
-    alfa_off = np.arccos((hu + n) / lxzp)
+    # print("hip_to_foot_distance_along_y_z_plane:", hip_to_foot_distance_along_y_z_plane)
+    # print("bent_leg_length:", bent_leg_length)
+    # print("gamma:", gamma)
+
+    lxzp = np.sqrt(bent_leg_length**2 + foot_x**2)
+    n = (lxzp**2 - calf_length**2 - thigh_length**2) / (2*thigh_length)
+    beta =  -np.arccos(n / calf_length)
+    # assert -1 <= n / calf_length <= 1, f"n / calf_length = {n / calf_length, n, calf_length}"
+
+    alfa_xzp =  -np.arctan(foot_x / bent_leg_length)
+    alfa_off = np.arccos((thigh_length + n) / lxzp)
     alfa = alfa_xzp + alfa_off
     if any( np.isnan([gamma,alfa,beta])):
         print([gamma,alfa,beta])
-        print(x,y,z,yoffh,hu,hl)
+        print(foot_x, foot_y, foot_z, hip_width,thigh_length,calf_length)
         # pass
     return [gamma,alfa,beta]

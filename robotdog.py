@@ -75,6 +75,7 @@ while True:
         dog.drp=0
     if keys.get(65298): #Down
         dog.drp=2
+        dog.set_leg_sequence_for_next_cycle(lseq=[2,3,1,0])
     if keys.get(65296): #Right
         dog.drp=1
         dog.xrcO=dog.xrO        #Set the center for the robot rotation to the current robot pos
@@ -89,6 +90,20 @@ while True:
     dog.leg_cycle_length = dog.walkLoopSpd / 2
     tv=int(((time.time()-t0) * dog.walkLoopSpd)  % (dog.walkLoopSpd * 2))
     dog.walk_loop(tv)
+
+    # yawri=1.3
+    # xrOi=np.array([1,1,0.5])
+    # dog.Ryawri = dog.RotYawr(yawri)
+    # legsRi=np.array([[dog.xhipf,dog.xhipf,dog.xhipb,dog.xhipb],
+    #                 [dog.yhipl+0.1,-dog.yhipl-0.1,dog.yhipl+0.1,-dog.yhipl-0.1],
+    #                 [-0.5,-0.5,-0.5,-0.5]])
+    # print(legsRi)
+    # dog.legsO=(np.dot(dog.Ryawri,legsRi).T + xrOi).T
+    # print(dog.legsO)
+    # legsR = np.dot(dog.Ryawri.T,dog.legsO)
+    # print(legsR)
+    # # x, y, z, v = [0,0,0],[0,0,0],[0,0,0],[0,0,0]
+    # dog.setlegsxyz(legsR[0], legsR[1], legsR[2], [1, 1, 1, 1])
     time.sleep(0.01)
 
 

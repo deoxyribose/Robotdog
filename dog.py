@@ -34,13 +34,13 @@ class Dog():
         self.yhipl=0.1
 
         self.xoffh=0.05
-        self.yoffh=0.05
-        self.hu=0.3
-        self.hl=0.3
-        linkPositions=[[self.xhipf, self.yhipl, 0], [self.xoffh, self.yoffh, 0], [0, 0, -self.hu], [0, 0, -self.hl],
-                    [self.xhipf, -self.yhipl, 0], [self.xoffh, -self.yoffh, 0], [0, 0, -self.hu], [0, 0, -self.hl],
-                    [self.xhipb, self.yhipl, 0], [self.xoffh, self.yoffh, 0], [0, 0, -self.hu], [0, 0, -self.hl],
-                    [self.xhipb, -self.yhipl, 0], [self.xoffh, -self.yoffh, 0], [0, 0, -self.hu], [0, 0, -self.hl],
+        self.hip_width=0.05
+        self.thigh_length=0.3
+        self.calf_length=0.3
+        linkPositions=[[self.xhipf, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+                    [self.xhipf, -self.yhipl, 0], [self.xoffh, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+                    [self.xhipb, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+                    [self.xhipb, -self.yhipl, 0], [self.xoffh, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
                     [0,0,+0.029]]
         linkOrientations=[[0,0,0,1]]*nlnk
         linkInertialFramePositions=[[0,0,0]]*nlnk
@@ -99,8 +99,6 @@ class Dog():
         # R means in robot-centered coordinates
         # r is for "of the robot"
         # i is initial
-        #Pre-init robot position
-        self.setlegsxyz([self.xhipf,self.xhipf,self.xhipb,self.xhipb],[self.yhipl+0.1,-self.yhipl-0.1,self.yhipl+0.1,-self.yhipl-0.1],[-0.5,-0.5,-0.5,-0.5],[1,1,1,1])
 
         yawri=1.3
         xrOi=np.array([1,1,0.5])
@@ -123,16 +121,17 @@ class Dog():
         self.Ryawr = self.RotYawr(yawri)
 
         #Recalc leg rel pos in robot frame and set the legs
-        self.dlegsO=(self.legsO.T-self.xbO).T
+        self.dlegsO=self.get_change_in_leg_pos(reference = self.xbO)
         dlegsR=np.dot(self.Ryawr.T,self.dlegsO)
+        print(dlegsR)
         self.setlegsxyz(dlegsR[0], dlegsR[1], dlegsR[2], [1,1,1,1])
 
         #Calculate a new robot center position from the average of the feet positions
         #Calculate a new robot yaw ditrection also from the feet positions
-        self.xfO=(self.legsO[:,0]+self.legsO[:,1])/2.0
-        self.xbO=(self.legsO[:,2]+self.legsO[:,3])/2.0
-        # xrOn=(self.xfO+self.xbO)/2.0 + np.array([0,0,0.5])
-        xfmbO=self.xfO-self.xbO
+        self.xfO = self.legsO[:,:2].mean(1) # mean of front legs
+        self.xbO = self.legsO[:,2:].mean(1) # mean of back legs
+
+        xfmbO = self.xfO - self.xbO
         self.yawrn=np.arctan2(xfmbO[1],xfmbO[0])
 
 
@@ -184,18 +183,28 @@ class Dog():
         spd=1
         for leg in range(4):
             if leg == 0:
-                args = xvec[leg]-self.xhipf, yvec[leg] - self.yhipl, zvec[leg], self.yoffh, self.hu, self.hl
+                args = xvec[leg]-self.xhipf, yvec[leg] - self.yhipl, zvec[leg], self.hip_width, self.thigh_length, self.calf_length
             elif leg == 1:
-                args = xvec[leg]-self.xhipf, yvec[leg] + self.yhipl, zvec[leg], -self.yoffh, self.hu, self.hl
+                args = xvec[leg]-self.xhipf, yvec[leg] + self.yhipl, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
             elif leg == 2:
-                args = xvec[leg]-self.xhipb, yvec[leg] - self.yhipl, zvec[leg], self.yoffh, self.hu, self.hl
+                args = xvec[leg]-self.xhipb, yvec[leg] - self.yhipl, zvec[leg], self.hip_width, self.thigh_length, self.calf_length
             elif leg == 3:
-                args = xvec[leg]-self.xhipb, yvec[leg] + self.yhipl, zvec[leg], -self.yoffh, self.hu, self.hl
+                args = xvec[leg]-self.xhipb, yvec[leg] + self.yhipl, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
             a = xyztoang(*args)
             for j, speed in enumerate([spd, vvec[leg], vvec[leg]]):
                 joint = leg*4 + j
                 p.setJointMotorControl2(self.dogId,joint,p.POSITION_CONTROL,targetPosition=a[j],force=1000,maxVelocity=speed)
 
+    def get_change_in_leg_pos(self, reference = None):
+        if reference is None:
+            reference = self.xrO
+        self.dlegsO = (self.legsO.T - reference).T
+        return self.dlegsO
+
+    def leg_pos_from_world_to_robot_frame(self):
+        dlegsR=np.dot(self.Ryawr.T,self.dlegsO)
+        return dlegsR
+                             
     def walk_loop(self, tv):
         # 800 units is one full walk cycle
         # with four legs, each leg moves in 200 units
@@ -213,32 +222,38 @@ class Dog():
 
         self.shift_body_weight(leg_idx, tv % self.leg_cycle_length)
         
-        #Recalc leg rel pos in desired robot frame
-        self.dlegsO=(self.legsO.T-self.xrO).T  #Translate
-        dlegsR=np.dot(self.Ryawr.T,self.dlegsO)  #Rotate (Note the inverse rotation is the transposed matrix)
+        #Calculate the change in leg position in the robot frame
+        self.dlegsO = self.get_change_in_leg_pos()
+        dlegsR = self.leg_pos_from_world_to_robot_frame()
         
         #Then apply the body movement and set the legs
-        self.setlegsxyz(dlegsR[0]-self.xoff-0.03,dlegsR[1]-self.yoff,dlegsR[2],self.vvec)  #0.03 is for tweaking the center of grav.
+        self.setlegsxyz(dlegsR[0]-self.xoff-0.03,
+                        dlegsR[1]-self.yoff,
+                        dlegsR[2],
+                        self.vvec)  #0.03 is for tweaking the center of grav.
         
         # Calculate the new position of the leg to move
         self.move_leg(leg_idx, tv % self.leg_cycle_length)
 
         #Calculate vectors and matrix for the next loop
-        xfrO=(self.legsO[:,0]+self.legsO[:,1])/2.0
-        xbkO=(self.legsO[:,2]+self.legsO[:,3])/2.0
-        self.xrO=(xfrO+xbkO)/2.0 
+        xfrO = self.legsO[:,:2].mean(1) # mean of front legs
+        xbkO = self.legsO[:,2:].mean(1) # mean of back legs
+        self.xrO = self.legsO.mean(1)
         self.xrO[2]=0.5
         xfmbO=xfrO-xbkO
         self.yawr=np.arctan2(xfmbO[1],xfmbO[0])
         self.Ryawr=self.RotYawr(self.yawr)
 
     def move_leg(self, leg_idx, leg_t):
+        """
+        Sets a new legs0 and yawl0
+        """
         # self.leg_cycle_length units is one full leg cycle
         if int(leg_t) <= self.leg_cycle_length * 0.4:
             # keep all legs down to the ground in the beginning of the leg cycle
             self.legsO[2, :] = 0.0
         else:
-            self.dlegsO=(self.legsO.T-self.xrcO).T
+            self.dlegsO = self.get_change_in_leg_pos(reference = self.xrcO)
             self.yawlO = np.arctan2(self.dlegsO[1, leg_idx], self.dlegsO[0, leg_idx])
             self.rlO = np.sqrt(self.dlegsO[0, leg_idx]**2 + self.dlegsO[1, leg_idx]**2)
 
@@ -253,14 +268,14 @@ class Dog():
                 self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]+0.01*np.cos(self.yawr)
                 self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]+0.01*np.sin(self.yawr)
             elif self.dr == 1:
-                self.yawlO-=0.015 
+                self.yawlO -= 0.015 
                 self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]
                 self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]
             elif self.dr == 2:
                 self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]-0.01*np.cos(self.yawr)
                 self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]-0.01*np.sin(self.yawr)
             elif self.dr == 3:
-                self.yawlO+=0.015 
+                self.yawlO += 0.015 
                 self.legsO[0, leg_idx] = self.rlO*np.cos(self.yawlO)+self.xrcO[0]
                 self.legsO[1, leg_idx] = self.rlO*np.sin(self.yawlO)+self.xrcO[1]
 
