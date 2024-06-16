@@ -121,8 +121,8 @@ class Dog():
         self.Ryawr = self.RotYawr(yawri)
 
         #Recalc leg rel pos in robot frame and set the legs
-        self.dlegsO=self.get_change_in_leg_pos(reference = self.xbO)
-        dlegsR=np.dot(self.Ryawr.T,self.dlegsO)
+        self.dlegsO = self.get_change_in_leg_pos(reference = self.xbO)
+        dlegsR = self.leg_pos_from_world_to_robot_frame()
         print(dlegsR)
         self.setlegsxyz(dlegsR[0], dlegsR[1], dlegsR[2], [1,1,1,1])
 
