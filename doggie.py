@@ -338,8 +338,24 @@ class Doggie():
         # the roll joint rotates around the axis 
         # that is parallel to the line between the hip and the body
         # so the x and y coordinates of the hip joint are
-        hip_joint_pos = [0, self.hip_width * np.cos(gamma), self.hip_width * np.sin(gamma)]
+        hip_joint_pos = self.linkPositions[leg_idx*4 + 1]
         hip_joint_pos = np.array(hip_joint_pos)
+        hip_joint_pos_delta = [0, self.hip_width * np.cos(gamma), self.hip_width * np.sin(gamma)]
+        hip_joint_pos_delta = np.array(hip_joint_pos_delta) + hip_joint_pos
+        print(rotmat @ hip_joint_pos + roll_joint_world_coords)
+        print(p.getLinkState(self.dogId, 1)[0])
+        assert np.allclose(rotmat @ hip_joint_pos + roll_joint_world_coords, p.getLinkState(self.dogId, 1)[0], 0.1)
+
+        # calculate the position of the knee joint
+        # we know the length of the thigh is thigh_length
+        # the angle of the hip joint is alpha
+        # knee_joint_pos = self.linkPositions[leg_idx*4 + 2]
+        # knee_joint_pos = np.array(knee_joint_pos)
+        # knee_joint_pos_delta = [self.thigh_length * np.cos(alpha), 0, self.thigh_length * np.sin(alpha)]
+        # knee_joint_pos_delta = np.array(knee_joint_pos_delta) + knee_joint_pos
+        # print(rotmat @ knee_joint_pos + knee_joint_pos)
+        # print(p.getLinkState(self.dogId, 2)[0])
+        # assert np.allclose(rotmat @ knee_joint_pos + knee_joint_pos, p.getLinkState(self.dogId, 2)[0], 0.1)
 
         # print(p.getJointState(self.dogId, 0)[0]) # gamma
         # print(p.getJointState(self.dogId, 1)[0]) # alpha
