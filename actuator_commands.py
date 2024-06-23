@@ -21,11 +21,11 @@ def xyztoang(foot_x, foot_y, foot_z, hip_width, thigh_length, calf_length):
     beta =  -np.arccos(n / calf_length)
     # assert -1 <= n / calf_length <= 1, f"n / calf_length = {n / calf_length, n, calf_length}"
 
-    alfa_xzp =  -np.arctan(foot_x / bent_leg_length)
-    alfa_off = np.arccos((thigh_length + n) / lxzp)
-    alfa = alfa_xzp + alfa_off
-    if any( np.isnan([gamma,alfa,beta])):
-        print([gamma,alfa,beta])
+    alpha_xzp =  -np.arctan(foot_x / bent_leg_length)
+    alpha_off = np.arccos((thigh_length + n) / lxzp)
+    alpha = alpha_xzp + alpha_off
+    if any( np.isnan([gamma,alpha,beta])):
+        print([gamma,alpha,beta])
         print(foot_x, foot_y, foot_z, hip_width,thigh_length,calf_length)
         # pass
-    return [gamma,alfa,beta]
+    return [gamma,alpha,beta]

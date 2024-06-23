@@ -3,7 +3,7 @@ import pybullet as p
 import numpy as np
 from actuator_commands import xyztoang
 
-class Dog():
+class Doggie():
     def __init__(self):
         #Dog robot part shapes
         sh_body = p.createCollisionShape(p.GEOM_BOX,halfExtents=[0.45, 0.08, 0.02])
@@ -37,7 +37,7 @@ class Dog():
         self.hip_width=0.05
         self.thigh_length=0.3
         self.calf_length=0.3
-        linkPositions=[[self.xhipf, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+        self.linkPositions=[[self.xhipf, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
                     [self.xhipf, -self.yhipl, 0], [self.xoffh, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
                     [self.xhipb, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
                     [self.xhipb, -self.yhipl, 0], [self.xoffh, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
@@ -48,7 +48,7 @@ class Dog():
         linkInertialFrameOrientations=[[0,0,0,1]]*nlnk
         #indices determine for each link which other link it is attached to
         # for example 3rd index = 2 means that the front left knee jjoint is attached to the front left hip
-        indices=[0, 1, 2, 3,
+        self.indices=[0, 1, 2, 3,
                 0, 5, 6, 7,
                 0, 9,10,11,
                 0,13,14,15,
@@ -74,15 +74,13 @@ class Dog():
                                 linkMasses=link_Masses,
                                 linkCollisionShapeIndices=linkCollisionShapeIndices,
                                 linkVisualShapeIndices=linkVisualShapeIndices,
-                                linkPositions=linkPositions,
+                                linkPositions=self.linkPositions,
                                 linkOrientations=linkOrientations,
                                 linkInertialFramePositions=linkInertialFramePositions,
                                 linkInertialFrameOrientations=linkInertialFrameOrientations,
-                                linkParentIndices=indices,
+                                linkParentIndices=self.indices,
                                 linkJointTypes=jointTypes,
                                 linkJointAxis=axis)
-        
-        self.set_init_pos_orient_pose()
         
         #Walking speed (changes the walking loop time)
         self.walkLoopSpd=400
@@ -93,7 +91,7 @@ class Dog():
         Rhor=np.array([[np.cos(yawr),-np.sin(yawr),0], [np.sin(yawr),np.cos(yawr),0], [0,0,1]])
         return Rhor
 
-    def set_init_pos_orient_pose(self):
+    def set_init_pos_orient_pose(self, init_pos = None):
         #Init robot position, orientation and pose params
         # O means in world-centered coordinates
         # R means in robot-centered coordinates
@@ -101,15 +99,20 @@ class Dog():
         # i is initial
 
         yawri=1.3
-        xrOi=np.array([1,1,0.5])
+        if init_pos is None:
+            xrOi=np.array([1,1,0.5])
+        else:
+            xrOi = np.array(init_pos)
+
         legsRi=np.array([[self.xhipf,self.xhipf,self.xhipb,self.xhipb],
                     [self.yhipl+0.1,-self.yhipl-0.1,self.yhipl+0.1,-self.yhipl-0.1],
                     [-0.5,-0.5,-0.5,-0.5]])
         #Set body to the robot pos
         xbOi=xrOi
+        
         #Init body position and orientation
         quat=p.getQuaternionFromEuler([0,0,yawri])
-        p.resetBasePositionAndOrientation(self.dogId,xbOi,quat)
+        p.resetBasePositionAndOrientation(self.dogId, xbOi, quat)
         #Init leg abs pos
         self.Ryawri = self.RotYawr(yawri)
         self.legsO=(np.dot(self.Ryawri,legsRi).T + xbOi).T   #Apply rotation plus translation
@@ -123,8 +126,8 @@ class Dog():
         #Recalc leg rel pos in robot frame and set the legs
         self.dlegsO = self.leg_pos_relative_to_reference(reference = self.xbO)
         dlegsR = self.leg_pos_from_world_to_robot_frame()
-        print(dlegsR)
-        self.setlegsxyz(dlegsR[0], dlegsR[1], dlegsR[2], [1,1,1,1])
+
+        self.setlegsxyz(dlegsR[0], dlegsR[1], dlegsR[2], [1,1,1,1], verbose=True)
 
         #Calculate a new robot center position from the average of the feet positions
         #Calculate a new robot yaw ditrection also from the feet positions
@@ -179,7 +182,15 @@ class Dog():
         p.changeDynamics(self.dogId,11,lateralFriction=2)
         p.changeDynamics(self.dogId,15,lateralFriction=2)
 
-    def setlegsxyz(self, xvec,yvec,zvec,vvec):
+    def setJointAnglesLeg(self, leg, angles, speed):
+        """
+        Set the joint angles of the leg
+        """
+        for i, angle in enumerate(angles):
+            joint = leg*4 + i
+            p.setJointMotorControl2(self.dogId,joint,p.POSITION_CONTROL,targetPosition=angle,force=1000,maxVelocity=speed[i])
+    
+    def setlegsxyz(self, xvec,yvec,zvec,vvec, verbose = False):
         spd=1
         for leg in range(4):
             if leg == 0:
@@ -191,9 +202,10 @@ class Dog():
             elif leg == 3:
                 args = xvec[leg]-self.xhipb, yvec[leg] + self.yhipl, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
             a = xyztoang(*args)
-            for j, speed in enumerate([spd, vvec[leg], vvec[leg]]):
-                joint = leg*4 + j
-                p.setJointMotorControl2(self.dogId,joint,p.POSITION_CONTROL,targetPosition=a[j],force=1000,maxVelocity=speed)
+            if verbose:
+                print(f"Leg {leg}: {a}")
+            
+            self.setJointAnglesLeg(leg, a, [spd, vvec[leg], vvec[leg]])
 
     def leg_pos_relative_to_reference(self, reference = None):
         if reference is None:
@@ -294,3 +306,85 @@ class Dog():
         elif int(leg_t) > self.leg_cycle_length * 0.8:
             self.xoff -= 0.004*(-1+2*int(leg_idx/2))
             self.yoff -= 0.004*(-1+2*(leg_idx%2))
+
+
+    def forward_kinematics(self, leg_idx, gamma, alpha, beta):
+        """
+        Calculate the forward kinematics for the selected leg, i.e.
+        given the leg index and the angles of the joints
+        return the [x, y, z] coordinates of the foot wrt the roll joint
+        """
+        # get current body center position
+        current_center_of_mass_pos = p.getBasePositionAndOrientation(self.dogId)[0]
+        current_center_of_mass_pos = np.array(current_center_of_mass_pos)
+
+        # get current body center orientation
+        current_center_of_mass_orientation = p.getBasePositionAndOrientation(self.dogId)[1]
+        current_center_of_mass_orientation = np.array(current_center_of_mass_orientation)
+        rotmat = np.array(p.getMatrixFromQuaternion(current_center_of_mass_orientation)).reshape(3,3)
+        # print(self.RotYawr(1.3)) # same matrix as rotmat
+
+        
+        # assume roll_joint_pos = [0, 0, 0]
+        roll_joint_pos = self.linkPositions[leg_idx*4]
+        roll_joint_pos = np.array(roll_joint_pos)
+
+        roll_joint_world_coords = current_center_of_mass_pos + rotmat @ roll_joint_pos
+        assert np.allclose(roll_joint_world_coords, p.getLinkState(self.dogId, 0)[0], 0.1)
+
+        # calculate the position of the hip joint
+        # we know the length of the hip is hip_width
+        # the angle of the roll joint is gamma
+        # the roll joint rotates around the axis 
+        # that is parallel to the line between the hip and the body
+        # so the x and y coordinates of the hip joint are
+        hip_joint_pos = [0, self.hip_width * np.cos(gamma), self.hip_width * np.sin(gamma)]
+        hip_joint_pos = np.array(hip_joint_pos)
+
+        # print(p.getJointState(self.dogId, 0)[0]) # gamma
+        # print(p.getJointState(self.dogId, 1)[0]) # alpha
+        # print(p.getJointState(self.dogId, 2)[0]) # beta
+
+        # print(current_center_of_mass_pos + roll_joint_pos)
+        # print(p.getLinkState(self.dogId, 1)[0])
+
+        # print(hip_joint_pos + current_center_of_mass_pos + roll_joint_pos)
+        # print(p.getLinkState(self.dogId, 2)[0])
+
+    def inverse_kinematics(self, foot_x, foot_y, foot_z, hip_width, thigh_length, calf_length):
+        """
+        Calculate the roll, hip and knee angles from the x,y,z coords of the foot wrt the hip.
+        """
+        hip_to_foot_distance_along_y_z_plane = np.sqrt(foot_y**2 + foot_z**2)
+        bent_leg_length = np.sqrt(hip_to_foot_distance_along_y_z_plane**2 - hip_width**2)
+        
+        gamma_yz =  -np.arctan(foot_y / foot_z)
+        gamma_h_offset =  -np.arctan(-hip_width / bent_leg_length)
+        gamma = gamma_yz - gamma_h_offset
+        
+        # print("hip_to_foot_distance_along_y_z_plane:", hip_to_foot_distance_along_y_z_plane)
+        # print("bent_leg_length:", bent_leg_length)
+        # print("gamma:", gamma)
+
+        lxzp = np.sqrt(bent_leg_length**2 + foot_x**2)
+        n = (lxzp**2 - calf_length**2 - thigh_length**2) / (2*thigh_length)
+        beta =  -np.arccos(n / calf_length)
+        # assert -1 <= n / calf_length <= 1, f"n / calf_length = {n / calf_length, n, calf_length}"
+
+        alpha_xzp =  -np.arctan(foot_x / bent_leg_length)
+        alpha_off = np.arccos((thigh_length + n) / lxzp)
+        alpha = alpha_xzp + alpha_off
+        if any( np.isnan([gamma,alpha,beta])):
+            print([gamma,alpha,beta])
+            print(foot_x, foot_y, foot_z, hip_width,thigh_length,calf_length)
+            # pass
+        return [gamma,alpha,beta]
+
+    
+    def shift_body_weight2(self, leg_idx, leg_t):
+        xoff = [0, 0, 0]
+        yoff = [0, 0, 0]
+        self.setlegsxyz(xoff,
+                yoff,
+                [0, 0, 0],
+                self.vvec)  #0.03 is for tweaking the center of grav.
