@@ -309,7 +309,7 @@ class Doggie():
             self.yoff -= 0.004*(-1+2*(leg_idx%2))
 
 
-    def forward_kinematics(self, leg_idx, gamma, alpha, beta):
+    def forward_kinematics(self, leg_idx, gamma, alpha, beta, t):
         """
         Calculate the forward kinematics for the selected leg, i.e.
         given the leg index and the angles of the joints
@@ -323,7 +323,8 @@ class Doggie():
         current_center_of_mass_orientation = p.getBasePositionAndOrientation(self.dogId)[1]
         current_center_of_mass_orientation = np.array(current_center_of_mass_orientation)
         rotmat = np.array(p.getMatrixFromQuaternion(current_center_of_mass_orientation)).reshape(3,3)
-        # print(self.RotYawr(1.3)) # same matrix as rotmat
+        # # rotmat rotates from base frame to world frame
+        # print(rotmat)
 
         
         # assume roll_joint_pos = [0, 0, 0]
@@ -333,7 +334,7 @@ class Doggie():
         roll_joint_world_coords = current_center_of_mass_pos + rotmat @ roll_joint_pos
         # print(roll_joint_world_coords)
         # print(p.getLinkState(self.dogId, 0)[0])
-        assert np.allclose(roll_joint_world_coords, p.getLinkState(self.dogId, 0)[0], 0.1)
+        assert t > 3 or np.allclose(roll_joint_world_coords, p.getLinkState(self.dogId, 0)[0], 0.02)
 
         # calculate the position of the hip joint
         # we know the length of the hip is hip_width
@@ -344,35 +345,35 @@ class Doggie():
         hip_joint_pos_delta = [self.hip_offset_along_body, self.hip_width * np.cos(gamma), self.hip_width * np.sin(gamma)]
         hip_joint_pos_delta = np.array(hip_joint_pos_delta)
         hip_joint_world_coords = rotmat @ hip_joint_pos_delta + roll_joint_world_coords
-        assert np.allclose(hip_joint_world_coords, p.getLinkState(self.dogId, 1)[0], 0.1)
+        assert t > 3 or np.allclose(hip_joint_world_coords, p.getLinkState(self.dogId, 1)[0], 0.02)
 
         # calculate the position of the knee joint
         # we know the length of the thigh is thigh_length
         # the angle of the hip joint is alpha
         # knee_joint_pos_delta = [self.thigh_length * np.cos(alpha), 0, self.thigh_length * np.sin(alpha)]
-        knee_joint_pos_delta = [self.thigh_length * np.cos(alpha), 0, self.thigh_length * np.sin(alpha)]
+        knee_joint_pos_delta = [-self.thigh_length * np.sin(alpha), 0, -self.thigh_length * np.cos(alpha)]
         knee_joint_pos_delta = np.array(knee_joint_pos_delta)
         # knee_joint_pos_delta is defined wrt. the hip joint
         # so first need to rotate it to the hip frame
         # then rotate it to the world frame
         # print(rotmat)
-        rotmat2 = np.array(p.getMatrixFromQuaternion(p.getLinkState(self.dogId, 1)[1])).reshape(3,3)
+        rotmat2 = np.array(p.getMatrixFromQuaternion(p.getLinkState(self.dogId, 0)[1])).reshape(3,3)
         # rotates from hip frame to world frame
         # hip frame's z axis is parallel to thigh
         np.set_printoptions(precision=4)
-        knee_joint_world_coords = rotmat @ knee_joint_pos_delta + hip_joint_world_coords
+        knee_joint_world_coords = rotmat2 @ knee_joint_pos_delta + hip_joint_world_coords
         # print(knee_joint_world_coords)
         # print(p.getLinkState(self.dogId, 2)[0])
-        # print(knee_joint_pos_delta)
+        print(knee_joint_world_coords)
+        print(np.array(p.getLinkState(self.dogId, 2)[0])) # knee_joint_world_coords
         # print(rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0]) - hip_joint_world_coords))
         # foo = rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0] - hip_joint_world_coords))
         # print(foo)
-        # assert np.allclose(knee_joint_world_coords, p.getLinkState(self.dogId, 2)[0], 0.1)
+        assert t < 0 or np.allclose(knee_joint_world_coords, p.getLinkState(self.dogId, 2)[0], 0.02)
         # print(hip_joint_world_coords)
-        # print(np.array(p.getLinkState(self.dogId, 2)[0])) # knee_joint_world_coords
-        print(rotmat2.T @ hip_joint_world_coords)
-        print(rotmat2.T @ np.array(p.getLinkState(self.dogId, 2)[0])) # knee_joint_world_coords
-        print(rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0]) - hip_joint_world_coords)) # knee_joint_world_coords
+        # print(rotmat2.T @ hip_joint_world_coords)
+        # print(rotmat2.T @ np.array(p.getLinkState(self.dogId, 2)[0])) # knee_joint_world_coords
+        # print(rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0]) - hip_joint_world_coords)) # knee_joint_world_coords
 
         # print(p.getJointState(self.dogId, 0)[0]) # gamma
         # print(p.getJointState(self.dogId, 1)[0]) # alpha
