@@ -52,7 +52,7 @@ block=p.createMultiBody(baseMass=0,baseCollisionShapeIndex = sh_colBox,
 
 
 t0=time.time()
-t = t0
+t = 0
 
 cyaw=10
 cpitch=-15
@@ -108,8 +108,7 @@ while True:
 
 
     # doggie.forward_kinematics(0, 0, 0, 0)
-    # doggie.forward_kinematics(0, 0.0991796640729571, 0.5628440549212753, -1.1256881098425509)
-    doggie.forward_kinematics(0, 0.0991796640729571, 0.4, -1.1256881098425509, t)
+    doggie.forward_kinematics(0, 0.0991796640729571, 0.5628440549212753, -1.1256881098425509, t)
 
     # dog.walk_loop(tv)
 
