@@ -31,7 +31,7 @@ doggie = Doggie()
 doggie.set_weight_motor()
 doggie.set_feet_friction()
 
-doggie.set_init_pos_orient_pose([2, 2, 0.5])
+doggie.set_init_pos_orient_pose([2, 2, 0.6])
 
 #Add earth like gravity
 p.setGravity(0,0,-9.81)
@@ -100,7 +100,15 @@ while True:
     # tv=int(((time.time()-t0) * dog.walkLoopSpd)  % (dog.walkLoopSpd * 2))
 
     # doggie.shift_body_weight2()
-    doggie.forward_kinematics(0, 0, 0, 0)
+    
+    # set color of link 1 to black
+    p.changeVisualShape(doggie.dogId, 1, rgbaColor=[0,0,0,1]) # front left hip
+    # p.changeVisualShape(doggie.dogId, 2, rgbaColor=[0,0,0,1]) # front left knee
+
+
+    # doggie.forward_kinematics(0, 0, 0, 0)
+    # doggie.forward_kinematics(0, 0.0991796640729571, 0.5628440549212753, -1.1256881098425509)
+    doggie.forward_kinematics(0, 0.0991796640729571, 0.4, -1.1256881098425509)
 
     # dog.walk_loop(tv)
 

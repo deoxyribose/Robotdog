@@ -31,23 +31,23 @@ class Doggie():
         #link positions wrt the link they are attached to
         self.xhipf=0.4
         self.xhipb=-0.4
-        self.yhipl=0.1
+        self.roll_width=0.2
 
-        self.xoffh=0.05
+        self.hip_offset_along_body=0.02
         self.hip_width=0.05
         self.thigh_length=0.3
         self.calf_length=0.3
-        self.linkPositions=[[self.xhipf, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
-                    [self.xhipf, -self.yhipl, 0], [self.xoffh, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
-                    [self.xhipb, self.yhipl, 0], [self.xoffh, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
-                    [self.xhipb, -self.yhipl, 0], [self.xoffh, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+        self.linkPositions=[[self.xhipf, self.roll_width, 0], [self.hip_offset_along_body, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+                    [self.xhipf, -self.roll_width, 0], [self.hip_offset_along_body, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+                    [self.xhipb, self.roll_width, 0], [self.hip_offset_along_body, self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
+                    [self.xhipb, -self.roll_width, 0], [self.hip_offset_along_body, -self.hip_width, 0], [0, 0, -self.thigh_length], [0, 0, -self.calf_length],
                     [0,0,+0.029]]
         linkOrientations=[[0,0,0,1]]*nlnk
         linkInertialFramePositions=[[0,0,0]]*nlnk
         #Note the orientations are given in quaternions (4 params). There are function to convert of Euler angles and back
         linkInertialFrameOrientations=[[0,0,0,1]]*nlnk
         #indices determine for each link which other link it is attached to
-        # for example 3rd index = 2 means that the front left knee jjoint is attached to the front left hip
+        # for example 3rd index = 2 means that the front left knee joint is attached to the front left hip
         self.indices=[0, 1, 2, 3,
                 0, 5, 6, 7,
                 0, 9,10,11,
@@ -105,7 +105,7 @@ class Doggie():
             xrOi = np.array(init_pos)
 
         legsRi=np.array([[self.xhipf,self.xhipf,self.xhipb,self.xhipb],
-                    [self.yhipl+0.1,-self.yhipl-0.1,self.yhipl+0.1,-self.yhipl-0.1],
+                    [self.roll_width+0.1,-self.roll_width-0.1,self.roll_width+0.1,-self.roll_width-0.1],
                     [-0.5,-0.5,-0.5,-0.5]])
         #Set body to the robot pos
         xbOi=xrOi
@@ -194,14 +194,15 @@ class Doggie():
         spd=1
         for leg in range(4):
             if leg == 0:
-                args = xvec[leg]-self.xhipf, yvec[leg] - self.yhipl, zvec[leg], self.hip_width, self.thigh_length, self.calf_length
+                args = xvec[leg]-self.xhipf, yvec[leg] - self.roll_width, zvec[leg], self.hip_width, self.thigh_length, self.calf_length
             elif leg == 1:
-                args = xvec[leg]-self.xhipf, yvec[leg] + self.yhipl, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
+                args = xvec[leg]-self.xhipf, yvec[leg] + self.roll_width, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
             elif leg == 2:
-                args = xvec[leg]-self.xhipb, yvec[leg] - self.yhipl, zvec[leg], self.hip_width, self.thigh_length, self.calf_length
+                args = xvec[leg]-self.xhipb, yvec[leg] - self.roll_width, zvec[leg], self.hip_width, self.thigh_length, self.calf_length
             elif leg == 3:
-                args = xvec[leg]-self.xhipb, yvec[leg] + self.yhipl, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
+                args = xvec[leg]-self.xhipb, yvec[leg] + self.roll_width, zvec[leg], -self.hip_width, self.thigh_length, self.calf_length
             a = xyztoang(*args)
+            a[1] = 0.4
             if verbose:
                 print(f"Leg {leg}: {a}")
             
@@ -330,6 +331,8 @@ class Doggie():
         roll_joint_pos = np.array(roll_joint_pos)
 
         roll_joint_world_coords = current_center_of_mass_pos + rotmat @ roll_joint_pos
+        # print(roll_joint_world_coords)
+        # print(p.getLinkState(self.dogId, 0)[0])
         assert np.allclose(roll_joint_world_coords, p.getLinkState(self.dogId, 0)[0], 0.1)
 
         # calculate the position of the hip joint
@@ -338,34 +341,42 @@ class Doggie():
         # the roll joint rotates around the axis 
         # that is parallel to the line between the hip and the body
         # so the x and y coordinates of the hip joint are
-        hip_joint_pos = self.linkPositions[leg_idx*4 + 1]
-        hip_joint_pos = np.array(hip_joint_pos)
-        hip_joint_pos_delta = [0, self.hip_width * np.cos(gamma), self.hip_width * np.sin(gamma)]
-        hip_joint_pos_delta = np.array(hip_joint_pos_delta) + hip_joint_pos
-        print(rotmat @ hip_joint_pos + roll_joint_world_coords)
-        print(p.getLinkState(self.dogId, 1)[0])
-        assert np.allclose(rotmat @ hip_joint_pos + roll_joint_world_coords, p.getLinkState(self.dogId, 1)[0], 0.1)
+        hip_joint_pos_delta = [self.hip_offset_along_body, self.hip_width * np.cos(gamma), self.hip_width * np.sin(gamma)]
+        hip_joint_pos_delta = np.array(hip_joint_pos_delta)
+        hip_joint_world_coords = rotmat @ hip_joint_pos_delta + roll_joint_world_coords
+        assert np.allclose(hip_joint_world_coords, p.getLinkState(self.dogId, 1)[0], 0.1)
 
         # calculate the position of the knee joint
         # we know the length of the thigh is thigh_length
         # the angle of the hip joint is alpha
-        # knee_joint_pos = self.linkPositions[leg_idx*4 + 2]
-        # knee_joint_pos = np.array(knee_joint_pos)
         # knee_joint_pos_delta = [self.thigh_length * np.cos(alpha), 0, self.thigh_length * np.sin(alpha)]
-        # knee_joint_pos_delta = np.array(knee_joint_pos_delta) + knee_joint_pos
-        # print(rotmat @ knee_joint_pos + knee_joint_pos)
+        knee_joint_pos_delta = [self.thigh_length * np.cos(alpha), 0, self.thigh_length * np.sin(alpha)]
+        knee_joint_pos_delta = np.array(knee_joint_pos_delta)
+        # knee_joint_pos_delta is defined wrt. the hip joint
+        # so first need to rotate it to the hip frame
+        # then rotate it to the world frame
+        # print(rotmat)
+        rotmat2 = np.array(p.getMatrixFromQuaternion(p.getLinkState(self.dogId, 1)[1])).reshape(3,3)
+        # rotates from hip frame to world frame
+        # hip frame's z axis is parallel to thigh
+        np.set_printoptions(precision=4)
+        knee_joint_world_coords = rotmat @ knee_joint_pos_delta + hip_joint_world_coords
+        # print(knee_joint_world_coords)
         # print(p.getLinkState(self.dogId, 2)[0])
-        # assert np.allclose(rotmat @ knee_joint_pos + knee_joint_pos, p.getLinkState(self.dogId, 2)[0], 0.1)
+        # print(knee_joint_pos_delta)
+        # print(rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0]) - hip_joint_world_coords))
+        # foo = rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0] - hip_joint_world_coords))
+        # print(foo)
+        # assert np.allclose(knee_joint_world_coords, p.getLinkState(self.dogId, 2)[0], 0.1)
+        # print(hip_joint_world_coords)
+        # print(np.array(p.getLinkState(self.dogId, 2)[0])) # knee_joint_world_coords
+        print(rotmat2.T @ hip_joint_world_coords)
+        print(rotmat2.T @ np.array(p.getLinkState(self.dogId, 2)[0])) # knee_joint_world_coords
+        print(rotmat2.T @ (np.array(p.getLinkState(self.dogId, 2)[0]) - hip_joint_world_coords)) # knee_joint_world_coords
 
         # print(p.getJointState(self.dogId, 0)[0]) # gamma
         # print(p.getJointState(self.dogId, 1)[0]) # alpha
         # print(p.getJointState(self.dogId, 2)[0]) # beta
-
-        # print(current_center_of_mass_pos + roll_joint_pos)
-        # print(p.getLinkState(self.dogId, 1)[0])
-
-        # print(hip_joint_pos + current_center_of_mass_pos + roll_joint_pos)
-        # print(p.getLinkState(self.dogId, 2)[0])
 
     def inverse_kinematics(self, foot_x, foot_y, foot_z, hip_width, thigh_length, calf_length):
         """
